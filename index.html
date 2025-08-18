@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Protein Structure Project</title>
+    <style>
+        /* Basic body styling for centering and font */
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f8f9fa;
+            color: #343a40;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        /* Main container for the content */
+        .container {
+            max-width: 900px;
+            margin: 20px;
+            padding: 40px;
+            background-color: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+
+        /* Header styling */
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            font-weight: 300;
+            color: #6c757d;
+            margin-top: 0;
+            margin-bottom: 2.5rem;
+        }
+
+        /* Navigation wrapper for the buttons */
+        .nav-wrapper {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 12px;
+        }
+
+        /* Styling for the navigation links to look like buttons */
+        .residue-btn {
+            padding: 10px 18px;
+            border: 1px solid #dee2e6;
+            background-color: #f8f9fa;
+            border-radius: 20px; /* Fully rounded edges */
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            color: #495057;
+            text-decoration: none;
+            transition: all 0.2s ease-in-out;
+        }
+
+        .residue-btn:hover {
+            background-color: #e9ecef;
+            border-color: #adb5bd;
+            transform: translateY(-2px); /* Slight lift on hover */
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Protein Structure MSc Project</h1>
+        <h2>Residue 3D Ramachandran Plots</h2>
+
+        <div class="nav-wrapper">
+            <!-- Links to the 20 standard amino acid plots -->
+            <a href="A_ramachandran.html" class="residue-btn">Alanine (A)</a>
+            <a href="C_ramachandran.html" class="residue-btn">Cysteine (C)</a>
+            <a href="D_ramachandran.html" class="residue-btn">Aspartic Acid (D)</a>
+            <a href="E_ramachandran.html" class="residue-btn">Glutamic Acid (E)</a>
+            <a href="F_ramachandran.html" class="residue-btn">Phenylalanine (F)</a>
+            <a href="G_ramachandran.html" class="residue-btn">Glycine (G)</a>
+            <a href="H_ramachandran.html" class="residue-btn">Histidine (H)</a>
+            <a href="I_ramachandran.html" class="residue-btn">Isoleucine (I)</a>
+            <a href="K_ramachandran.html" class="residue-btn">Lysine (K)</a>
+            <a href="L_ramachandran.html" class="residue-btn">Leucine (L)</a>
+            <a href="M_ramachandran.html" class="residue-btn">Methionine (M)</a>
+            <a href="N_ramachandran.html" class="residue-btn">Asparagine (N)</a>
+            <a href="P_ramachandran.html" class="residue-btn">Proline (P)</a>
+            <a href="Q_ramachandran.html" class="residue-btn">Glutamine (Q)</a>
+            <a href="R_ramachandran.html" class="residue-btn">Arginine (R)</a>
+            <a href="S_ramachandran.html" class="residue-btn">Serine (S)</a>
+            <a href="T_ramachandran.html" class="residue-btn">Threonine (T)</a>
+            <a href="V_ramachandran.html" class="residue-btn">Valine (V)</a>
+            <a href="W_ramachandran.html" class="residue-btn">Tryptophan (W)</a>
+            <a href="Y_ramachandran.html" class="residue-btn">Tyrosine (Y)</a>
+        </div>
+    </div>
+
+</body>
+</html>
