@@ -1,6 +1,7 @@
 # Proteins MSc Project 
 
----
+<img width="1762" height="773" alt="image" src="https://github.com/user-attachments/assets/26d05505-ce5c-465d-8e71-d164a465f4e7" />
+
 
 ## 3D Residue Ramachandran Plots (phi, psi)
 
