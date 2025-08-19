@@ -16,7 +16,7 @@ A **Ramachandran plot** visualizes the sterically allowed conformations for the 
 
 This section explores correlations between adjacent residue dihedral angles using 3D projections of the 4D conformational space.
 
-* [**phi(i) vs psi(i)** (Full Ramachandran)](phi_i_vs_psi_i_surface.html)
+* [**phi(i) vs psi(i)** - Full Ramachandran](phi_i_vs_psi_i_surface.html)
 * [**psi(i) vs phi(i+1)**](psi_i_vs_phi_i+1_surface.html)
 * [**phi(i) vs phi(i+1)**](phi_i_vs_phi_i+1_surface.html)
 * [**phi(i) vs psi(i+1)**](phi_i_vs_psi_i+1_surface.html)
