@@ -1,8 +1,5 @@
 # Proteins MSc Project 
 
-<img width="1762" height="773" alt="image" src="https://github.com/user-attachments/assets/26d05505-ce5c-465d-8e71-d164a465f4e7" />
-
-
 ## 3D Residue Ramachandran Plots (phi, psi)
 
 A **Ramachandran plot** visualizes the sterically allowed conformations for the backbone dihedral angles (phi and psi) of amino acid residues.
@@ -26,3 +23,6 @@ This section explores correlations between adjacent residue dihedral angles usin
 * [**psi(i) vs phi(i+1)**](psi_i_vs_phi_i+1_surface.html)
 * [**phi(i) vs phi(i+1)**](phi_i_vs_phi_i+1_surface.html)
 * [**phi(i) vs psi(i+1)**](phi_i_vs_psi_i+1_surface.html)
+
+<img width="1762" height="773" alt="image" src="https://github.com/user-attachments/assets/26d05505-ce5c-465d-8e71-d164a465f4e7" />
+
