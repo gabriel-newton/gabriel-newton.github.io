@@ -1,0 +1,7 @@
+@TYPE blog
+@TITLE Moracore
+@DATE 2026-06-15
+@TAGS moracore, blog, github
+---
+~ This begins my entry logs for moracore. The primary idea for this is to document any findings done with ProtNRD and RamaCube, which I expect to be the next two entries after this one.
+~ Still need to create the potential for adding a extracted graph into the visualization section which for now just holds small sketches in the bottom left.

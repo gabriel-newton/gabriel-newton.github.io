@@ -1,0 +1,1050 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Moracore</title>
+    <style>
+        :root {
+            --bg: #010203;
+            --panel-bg: rgba(6, 7, 12, 0.55);
+            --border: rgba(255, 255, 255, 0.07);
+            --hr: rgba(255, 255, 255, 0.06);
+            --heading: #d8d8ec;
+            --name: #9090b0;
+            --desc: #757591;
+            --muted: #55556e;
+            --accent: #a98bff;
+            --accent-dim: rgba(169, 139, 255, 0.4);
+            --hover-bg: rgba(169, 139, 255, 0.07);
+            --active-bg: rgba(169, 139, 255, 0.12);
+            --track-bg: rgba(255, 255, 255, 0.08);
+            --bezel: 10px;
+            --line-outer: rgba(255, 255, 255, 0.13);
+            --line-inner: rgba(255, 255, 255, 0.24);
+            --notch-w: 195px;
+            --notch-h: 148px;
+            /* opaque band painted just inside the border to mask text at the edge */
+            --matte: #08090f;
+        }
+
+        [data-theme="light"] {
+            --bg: #eceef3;
+            --panel-bg: rgba(255, 255, 255, 0.6);
+            --border: rgba(20, 20, 45, 0.1);
+            --hr: rgba(20, 20, 45, 0.08);
+            --heading: #1b1c2b;
+            --name: #2f3146;
+            --desc: #525574;
+            --muted: #8587a0;
+            --accent: #6b40d6;
+            --accent-dim: rgba(107, 64, 214, 0.35);
+            --hover-bg: rgba(107, 64, 214, 0.06);
+            --active-bg: rgba(107, 64, 214, 0.12);
+            --track-bg: rgba(20, 20, 45, 0.1);
+            --line-outer: rgba(20, 20, 45, 0.16);
+            --line-inner: rgba(20, 20, 45, 0.28);
+            --matte: #f4f5f9;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html, body {
+            height: 100%;
+        }
+
+        body {
+            background: var(--bg);
+            font-family: 'Fira Code', ui-monospace, monospace;
+            display: flex;
+            overflow: hidden;
+            color: var(--name);
+            font-size: 14px;
+            -webkit-font-smoothing: antialiased;
+            transition: background 0.25s ease;
+        }
+
+        #bg-canvas {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        #app {
+            position: relative;
+            z-index: 1;
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            grid-template-rows: 130px 1fr;
+            width: 100%;
+            height: 100%;
+            padding: 18px;
+            gap: 18px;
+        }
+
+        /* top-left cell stays empty so the background logo shows in its own space,
+           cutting the corner away from the main box */
+
+        /* double-line panel frames, drawn as SVG so they follow the notch */
+        #frames {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            z-index: 2;
+            overflow: visible;
+        }
+
+        #frames .outer {
+            fill: none;
+            stroke: var(--line-outer);
+            stroke-width: 1;
+        }
+
+        #frames .inner {
+            fill: none;
+            stroke: var(--line-inner);
+            stroke-width: 2;
+        }
+
+        /* opaque band hugging the inside of the border; masks any text that
+           scrolls up against the edge or the notch diagonal */
+        #frames .matte {
+            fill: none;
+            stroke: var(--matte);
+            stroke-width: 14;
+            stroke-linejoin: round;
+        }
+
+        /* --- Sidebar --- */
+        aside {
+            grid-area: 2 / 1 / 3 / 2;
+            background: var(--panel-bg);
+            border-radius: var(--bezel);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        #brand {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--hr);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .tab-btn {
+            background: none;
+            border: none;
+            font-family: inherit;
+            font-size: 0.8rem;
+            color: var(--name);
+            cursor: pointer;
+            padding: 5px 10px;
+            border-radius: 6px;
+            transition: background 0.12s, color 0.12s;
+        }
+
+        .tab-btn:hover {
+            background: var(--hover-bg);
+            color: var(--heading);
+        }
+
+        .tab-btn.active {
+            background: var(--active-bg);
+            color: var(--accent);
+        }
+
+        /* phone-style toggle */
+        .switch {
+            position: relative;
+            display: inline-flex;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .switch input {
+            position: absolute;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .track {
+            position: relative;
+            width: 50px;
+            height: 24px;
+            border-radius: 24px;
+            background: var(--track-bg);
+            border: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 5px;
+            color: var(--muted);
+            transition: background 0.2s;
+        }
+
+        .track .ico {
+            width: 13px;
+            height: 13px;
+            flex-shrink: 0;
+            z-index: 1;
+        }
+
+        .knob {
+            position: absolute;
+            top: 50%;
+            left: 3px;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--accent);
+            transform: translateY(-50%);
+            transition: left 0.2s ease;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+            z-index: 0;
+        }
+
+        .switch input:checked + .track .knob {
+            left: 27px;
+        }
+
+        #sidebar-nav {
+            max-height: 50%;
+            overflow-y: auto;
+            padding: 14px 12px 18px;
+        }
+        
+        #sidebar-canvas-space {
+            flex: 1;
+            border-top: 1px solid var(--hr);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 14px;
+        }
+
+        /* bottom-left preview of the post currently hovered in the feed */
+        /* the sketch PNG (transparent bg, opaque linework) is used as a mask and
+           filled with the body-text colour, so it always matches the text and
+           flips with the theme automatically */
+        #hover-thumb {
+            width: 100%;
+            height: 100%;
+            background-color: var(--name);
+            -webkit-mask-repeat: no-repeat;
+            mask-repeat: no-repeat;
+            -webkit-mask-position: center;
+            mask-position: center;
+            -webkit-mask-size: contain;
+            mask-size: contain;
+            opacity: 0;
+            transition: opacity 0.25s ease;
+        }
+
+        #hover-thumb.show {
+            opacity: 1;
+        }
+
+        .nav-group {
+            background: var(--hover-bg);
+            border: 1px solid var(--hr);
+            border-radius: var(--bezel);
+            padding: 6px;
+            margin-bottom: 12px;
+        }
+
+        .nav-group-label {
+            font-size: 0.6rem;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            color: var(--muted);
+            padding: 4px 8px 7px;
+        }
+
+        ul {
+            list-style: none;
+        }
+
+        li.nav-item {
+            position: relative;
+            padding: 7px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            color: var(--name);
+            transition: background 0.12s, color 0.12s;
+        }
+
+        li.nav-item:hover {
+            background: var(--hover-bg);
+            color: var(--heading);
+        }
+
+        li.nav-item.active {
+            background: var(--active-bg);
+            color: var(--accent);
+        }
+
+        li.nav-item.active::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 20%;
+            height: 60%;
+            width: 2px;
+            border-radius: 2px;
+            background: var(--accent);
+        }
+
+        /* --- Main Content --- */
+        main {
+            grid-area: 1 / 2 / 3 / 3;
+            background: var(--panel-bg);
+            border-radius: var(--bezel);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            overflow: hidden;
+            /* gutter: keeps scrolling text off the clipped panel border */
+            padding: 14px;
+        }
+
+        /* the real scroll viewport, inset from the border by main's gutter */
+        #scroll {
+            height: 100%;
+            overflow-y: auto;
+            padding: 0 42px 30px;
+        }
+
+        /* When the fixed-size logo reaches into main, JS adds .has-notch and sets
+           --notch-w to the overlap; the bite's bottom lines up with the sidebar
+           top, corners rounded with --bezel so they match the panel radius. */
+        main.has-notch {
+            clip-path: polygon(
+                calc(var(--notch-w) + var(--bezel)) 0,
+                100% 0,
+                100% 100%,
+                0 100%,
+                0 calc(var(--notch-h) + var(--bezel)),
+                calc(var(--bezel) * 0.134) calc(var(--notch-h) + var(--bezel) * 0.5),
+                calc(var(--bezel) * 0.5) calc(var(--notch-h) + var(--bezel) * 0.134),
+                var(--bezel) var(--notch-h),
+                calc(var(--notch-w) - var(--bezel)) var(--notch-h),
+                calc(var(--notch-w) - var(--bezel) * 0.5) calc(var(--notch-h) - var(--bezel) * 0.134),
+                calc(var(--notch-w) - var(--bezel) * 0.134) calc(var(--notch-h) - var(--bezel) * 0.5),
+                var(--notch-w) calc(var(--notch-h) - var(--bezel)),
+                var(--notch-w) var(--bezel),
+                calc(var(--notch-w) + var(--bezel) * 0.134) calc(var(--bezel) * 0.5),
+                calc(var(--notch-w) + var(--bezel) * 0.5) calc(var(--bezel) * 0.134)
+            );
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-dim);
+        }
+
+        #content-area {
+            max-width: 720px;
+            margin: 0 auto;
+            padding-top: 32px;
+        }
+
+        /* when the cutout is present, drop the start of the feed below it so the
+           opening text clears the notch (it still scrolls up through it after) */
+        main.has-notch #content-area {
+            padding-top: calc(var(--notch-h) + 24px);
+        }
+
+        /* --- Post --- */
+        .post + .post {
+            margin-top: 40px;
+            padding-top: 40px;
+            border-top: 1px solid var(--hr);
+        }
+
+        .post-title {
+            font-size: 1.25rem;
+            font-weight: 500;
+            color: var(--heading);
+            letter-spacing: -0.01em;
+            line-height: 1.3;
+        }
+
+        .post-meta {
+            font-size: 0.7rem;
+            color: var(--muted);
+            margin-top: 8px;
+            letter-spacing: 0.02em;
+        }
+
+        .post-sub {
+            font-size: 0.95rem;
+            color: var(--name);
+            margin-top: 14px;
+            line-height: 1.6;
+        }
+
+        .post-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 16px;
+        }
+
+        a.btn {
+            text-decoration: none;
+            font-size: 0.68rem;
+            padding: 5px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            color: var(--desc);
+            transition: all 0.15s;
+        }
+
+        a.btn:hover {
+            border-color: var(--accent-dim);
+            color: var(--accent);
+        }
+
+        .post-body {
+            margin-top: 22px;
+        }
+
+        .post-p {
+            font-size: 0.88rem;
+            color: var(--desc);
+            line-height: 1.75;
+            margin-bottom: 14px;
+        }
+
+        .post-body img {
+            max-width: 100%;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            margin: 8px 0 18px;
+            display: block;
+        }
+
+        .empty-state {
+            color: var(--muted);
+            text-align: center;
+            margin-top: 120px;
+            font-size: 0.85rem;
+        }
+
+        .empty-state.error {
+            color: #e06c75;
+        }
+
+        /* --- GitHub repo badge: a tab fused to the right edge, shown on project views --- */
+        .repo-badge {
+            position: fixed;
+            right: 0;
+            top: 46%;
+            transform: translateY(-50%);
+            z-index: 3;
+            display: none;
+            align-items: center;
+            justify-content: flex-start;
+            width: 46px;
+            height: 52px;
+            padding-left: 12px;
+            border-radius: 12px 0 0 12px;
+            background: #111418;
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-right: none;
+            color: #fff;
+            text-decoration: none;
+            box-shadow: -3px 2px 14px rgba(0, 0, 0, 0.45);
+            transition: width 0.18s ease, padding-left 0.18s ease, border-color 0.18s ease;
+        }
+
+        .repo-badge.show {
+            display: inline-flex;
+        }
+
+        .repo-badge:hover {
+            width: 60px;
+            padding-left: 16px;
+            border-color: rgba(255, 255, 255, 0.32);
+        }
+
+        .repo-badge .gh-ico {
+            width: 22px;
+            height: 22px;
+            fill: currentColor;
+            flex-shrink: 0;
+        }
+
+        @media (max-width: 760px) {
+            body {
+                overflow: auto;
+            }
+            #app {
+                grid-template-columns: 1fr;
+                grid-template-rows: 96px auto auto;
+                height: auto;
+                min-height: 100%;
+            }
+            aside {
+                grid-area: 2 / 1 / 3 / 2;
+            }
+            main {
+                grid-area: 3 / 1 / 4 / 2;
+                padding: 0;
+                clip-path: none;
+            }
+            #scroll {
+                height: auto;
+                overflow: visible;
+                padding: 28px 22px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <canvas id="bg-canvas"></canvas>
+
+    <div id="app">
+        <aside>
+            <div id="brand">
+                <button class="tab-btn" id="journal-btn">Journal</button>
+                <label class="switch" title="Toggle light / dark">
+                    <input type="checkbox" id="theme-toggle">
+                    <span class="track">
+                        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+                        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+                        <span class="knob"></span>
+                    </span>
+                </label>
+            </div>
+            <nav id="sidebar-nav"></nav>
+            <div id="sidebar-canvas-space">
+                <div id="hover-thumb" aria-hidden="true"></div>
+            </div>
+        </aside>
+
+        <main>
+            <div id="scroll">
+                <div id="content-area">
+                    <div class="empty-state">Loading…</div>
+                </div>
+            </div>
+        </main>
+
+        <svg id="frames" aria-hidden="true"></svg>
+
+        <!-- GitHub mark defined once, referenced by every badge variant below -->
+        <svg aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden">
+            <symbol id="gh-mark" viewBox="0 0 24 24"><path d="M12 .5C5.37.5 0 5.78 0 12.29c0 5.2 3.44 9.6 8.21 11.16.6.11.82-.25.82-.56v-2c-3.34.71-4.04-1.58-4.04-1.58-.55-1.37-1.34-1.74-1.34-1.74-1.09-.73.08-.72.08-.72 1.2.08 1.84 1.21 1.84 1.21 1.07 1.79 2.81 1.27 3.5.97.11-.76.42-1.27.76-1.56-2.67-.3-5.47-1.31-5.47-5.81 0-1.28.47-2.33 1.24-3.15-.13-.3-.54-1.52.12-3.17 0 0 1.01-.32 3.3 1.2.96-.26 1.98-.39 3-.39 1.02 0 2.04.13 3 .39 2.29-1.52 3.3-1.2 3.3-1.2.66 1.65.25 2.87.12 3.17.77.82 1.24 1.87 1.24 3.15 0 4.51-2.81 5.5-5.49 5.79.43.36.81 1.08.81 2.18v3.23c0 .31.22.68.83.56C20.57 21.88 24 17.49 24 12.29 24 5.78 18.63.5 12 .5z"/></symbol>
+        </svg>
+
+        <!-- GitHub repo badge — a tab fused to the right edge, shown only on project views -->
+        <a class="repo-badge" href="#" target="_blank" rel="noopener" title="View source on GitHub" aria-label="View source on GitHub"><svg class="gh-ico"><use href="#gh-mark"></use></svg></a>
+    </div>
+
+    <script>
+        (function () {
+            // --- Theme Logic ---
+            const THEMES = {
+                dark: { bg: '#010203', aether: ['#0d1422', '#11182a', '#141f40', '#0b1810', '#0e1c28'] },
+                light: { bg: '#eceef3', aether: ['#dde1ec', '#d4dae8', '#cad3e6', '#e0e4ee', '#d0d9e8'] }
+            };
+
+            let currentTheme = localStorage.getItem('theme') || 'dark';
+            const toggleInput = document.getElementById('theme-toggle');
+
+            function applyTheme(t) {
+                currentTheme = t;
+                document.documentElement.setAttribute('data-theme', t);
+                localStorage.setItem('theme', t);
+                toggleInput.checked = (t === 'light');
+            }
+            applyTheme(currentTheme);
+
+            toggleInput.addEventListener('change', () =>
+                applyTheme(toggleInput.checked ? 'light' : 'dark'));
+
+            // --- Canvas Rendering ---
+            const FONT_SIZE = 14, CHAR_WIDTH = FONT_SIZE * 0.6, CHAR_HEIGHT = FONT_SIZE;
+            const LOGO_SCALE = 1.3; // fixed logo size — the notch is derived from this, not the reverse
+            const BRAILLE_FLOW = '⠀⠁⠙⠫⠻⠿⠿⡿⣿';
+
+            const LOGO_RAW = [
+                '⢂⣄⢂⢂⢂⢂⣠⢂⢂⢂⢂⢂⢂⢂⢂⢂⢂⢂⢂⢂⢂⢂⢂⢂⢂⢂⢂⢂⢂⢂⢂⢂⢂⢂⢂⢂⢂⢂⢂⢂⢂⢂⢂⢂⢂⢂⢂',
+                '⢸⣿⣄⢂⢂⣠⣿⢂⢂⣶⣿⣶⢂⢂⣿⣿⣷⢂⢂⢂⣼⣿⣧⢂⢂⢂⣤⣶⣿⣿⢂⢂⣶⣿⣶⢂⢂⣿⣿⣷⢂⢂⣿⣿⣿⠿⠛',
+                '⢸⣿⢻⣄⣠⡟⣿⢂⣼⡏⢂⢹⣧⢂⣿⢂⣸⡇⢂⣸⡏⢂⢹⣧⢂⣼⡏⢂⢂⢹⢂⣼⣿⣿⣿⣧⢂⣿⢂⣸⡇⢂⣿⡇⢂⢂⢂',
+                '⢸⣿⢂⢻⡟⢂⣿⢂⣿⢂⢂⢂⣿⢂⣿⣿⣿⢂⢂⣿⠛⠛⠛⣿⢂⣿⢂⢂⢂⢂⢂⣿⣿⣿⣿⣿⢂⣿⣿⣿⢂⢂⣿⣿⠿⠛⢂',
+                '⢸⣿⢂⢂⢂⢂⣿⢂⢻⣇⢂⣸⡟⢂⣿⢂⢻⣇⢂⣿⢂⢂⢂⣿⢂⢻⣇⢂⢂⣸⢂⢻⣿⣿⣿⡟⢂⣿⢂⢻⣧⢂⣿⡇⢂⢂⢂',
+                '⢂⣿⢂⢂⢂⢂⣿⢂⢂⠿⣿⠿⢂⢂⣿⢂⢂⠻⣧⢹⡇⢂⢸⡏⢂⢂⠛⠿⣿⣿⢂⢂⠿⣿⠿⢂⢂⣿⢂⢂⠻⣧⠹⣿⣿⣶⣤',
+                '⢂⠉⢂⢂⢂⢂⠉⢂⢂⢂⢂⢂⢂⢂⢂⢂⢂⢂⠙⢂⢂⢂⢂⢂⢂⢂⢂⢂⢂⢂⢂⢂⢂⢂⢂⢂⢂⢂⢂⢂⢂⠙⢷⢂⢂⢂⢂',
+            ];
+            const LOGO_ROWS = LOGO_RAW.map(r => [...r.replace(/⢂/g, '⠀')]);
+            const BH = LOGO_ROWS.length, BW = Math.max(...LOGO_ROWS.map(r => r.length));
+
+            const bgCanvas = document.getElementById('bg-canvas');
+            const bgCtx = bgCanvas.getContext('2d');
+
+            let cols, rows, grid = [];
+            let blScale = 1, blOX = 0, blOY = 0; // background logo placement
+
+            const STOPS = [[0, 204, 128], [152, 60, 255], [210, 120, 10], [152, 60, 255]];
+            function waterfallColor(phase) {
+                const N = STOPS.length, t = ((phase % N) + N) % N, i = Math.floor(t), f = t - i;
+                const s = f * f * (3 - 2 * f), a = STOPS[i], b = STOPS[(i + 1) % N];
+                return `rgb(${Math.round(a[0] + (b[0] - a[0]) * s)},${Math.round(a[1] + (b[1] - a[1]) * s)},${Math.round(a[2] + (b[2] - a[2]) * s)})`;
+            }
+
+            // --- Panel frames (double border that follows the notch) ---
+            const appEl = document.getElementById('app');
+            const asideEl = document.querySelector('aside');
+            const mainEl = document.querySelector('main');
+            const framesSvg = document.getElementById('frames');
+
+            // One closed outline for a rounded panel, optionally with a top-left
+            // notch (nW x nH). `i` insets the whole shape so we can draw a thin
+            // outer line and a thicker inner line in parallel.
+            function framePath(x, y, w, h, bz, nW, nH, i) {
+                const L = x + i, T = y + i, R = x + w - i, B = y + h - i;
+                const cv = Math.max(bz - i, 1);
+                if (nW <= 0) {
+                    return `M ${L + cv} ${T} L ${R - cv} ${T} A ${cv} ${cv} 0 0 1 ${R} ${T + cv}`
+                        + ` L ${R} ${B - cv} A ${cv} ${cv} 0 0 1 ${R - cv} ${B}`
+                        + ` L ${L + cv} ${B} A ${cv} ${cv} 0 0 1 ${L} ${B - cv}`
+                        + ` L ${L} ${T + cv} A ${cv} ${cv} 0 0 1 ${L + cv} ${T} Z`;
+                }
+                const nx = x + nW + i, ny = y + nH + i, cc = bz + i;
+                return `M ${nx + cv} ${T}`
+                    + ` L ${R - cv} ${T} A ${cv} ${cv} 0 0 1 ${R} ${T + cv}`
+                    + ` L ${R} ${B - cv} A ${cv} ${cv} 0 0 1 ${R - cv} ${B}`
+                    + ` L ${L + cv} ${B} A ${cv} ${cv} 0 0 1 ${L} ${B - cv}`
+                    + ` L ${L} ${ny + cv} A ${cv} ${cv} 0 0 1 ${L + cv} ${ny}`
+                    + ` L ${nx - cc} ${ny} A ${cc} ${cc} 0 0 0 ${nx} ${ny - cc}`
+                    + ` L ${nx} ${T + cv} A ${cv} ${cv} 0 0 1 ${nx + cv} ${T} Z`;
+            }
+
+            function panelFrame(el, ar, bz, nW, nH, matte) {
+                const r = el.getBoundingClientRect();
+                const x = r.left - ar.left, y = r.top - ar.top, w = r.width, h = r.height;
+                // matte band centered 7px in with a 14px stroke -> covers the edge..14px,
+                // painted first so the two thin lines draw on top of it
+                const band = matte ? `<path class="matte" d="${framePath(x, y, w, h, bz, nW, nH, 7)}"/>` : '';
+                return band
+                    + `<path class="outer" d="${framePath(x, y, w, h, bz, nW, nH, 0.5)}"/>`
+                    + `<path class="inner" d="${framePath(x, y, w, h, bz, nW, nH, 4)}"/>`;
+            }
+
+            function drawFrames() {
+                const ar = appEl.getBoundingClientRect();
+                framesSvg.setAttribute('width', ar.width);
+                framesSvg.setAttribute('height', ar.height);
+                framesSvg.setAttribute('viewBox', `0 0 ${ar.width} ${ar.height}`);
+                const cs = getComputedStyle(document.documentElement);
+                const bz = parseFloat(cs.getPropertyValue('--bezel')) || 10;
+                const notched = mainEl.classList.contains('has-notch');
+                const nw = notched ? (parseFloat(cs.getPropertyValue('--notch-w')) || 195) : 0;
+                const nh = notched ? (parseFloat(cs.getPropertyValue('--notch-h')) || 148) : 0;
+                framesSvg.innerHTML = panelFrame(asideEl, ar, bz, 0, 0, false)
+                    + panelFrame(mainEl, ar, bz, nw, nh, true);
+            }
+
+            function initCanvas() {
+                const dpr = window.devicePixelRatio || 1;
+
+                // BG Setup
+                bgCanvas.width = window.innerWidth * dpr;
+                bgCanvas.height = window.innerHeight * dpr;
+                bgCanvas.style.width = window.innerWidth + 'px';
+                bgCanvas.style.height = window.innerHeight + 'px';
+                bgCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                cols = Math.ceil(window.innerWidth / CHAR_WIDTH);
+                rows = Math.ceil(window.innerHeight / CHAR_HEIGHT);
+                grid = Array.from({ length: rows }, () => Array.from({ length: cols }, () => ({ baseAlpha: 0.05 + Math.random() * 0.1 })));
+                bgCtx.font = `${FONT_SIZE}px 'Fira Code', monospace`;
+                bgCtx.textBaseline = 'top';
+
+                // The logo is a fixed size; the notch in main is derived from
+                // wherever that fixed logo crosses main's left edge.
+                const pad = 18, gap = 18, inset = 8;
+                const ROW_H = 130, ROOM = 20; // ROOM = breathing space around the logo inside the notch
+
+                if (window.innerWidth <= 760) {
+                    // mobile: centered title band at the top, scaled to fit the width
+                    mainEl.classList.remove('has-notch');
+                    const regionH = 96;
+                    const maxW = window.innerWidth - pad * 2 - inset * 2;
+                    blScale = Math.min(maxW / (BW * CHAR_WIDTH), (regionH - inset * 2) / (BH * CHAR_HEIGHT));
+                    blOX = (window.innerWidth - BW * CHAR_WIDTH * blScale) / 2;
+                    blOY = pad + (regionH - BH * CHAR_HEIGHT * blScale) / 2;
+                } else {
+                    const asideW = asideEl.offsetWidth;
+                    const mainLeft = pad + asideW + gap;
+                    const bandH = ROW_H + gap; // top band, down to the sidebar's top edge
+
+                    blScale = LOGO_SCALE; // fixed — no resizing
+                    const logoW = BW * CHAR_WIDTH * blScale;
+                    const logoH = BH * CHAR_HEIGHT * blScale;
+                    blOX = pad + inset;
+                    blOY = pad + (bandH - logoH) / 2;
+
+                    // Does the fixed logo reach into main? If so, carve a notch
+                    // exactly as wide as the overlap (plus breathing room).
+                    const overlap = (blOX + logoW) - mainLeft;
+                    if (overlap > 0) {
+                        const rootStyle = document.documentElement.style;
+                        rootStyle.setProperty('--notch-w', (overlap + ROOM) + 'px');
+                        rootStyle.setProperty('--notch-h', bandH + 'px');
+                        mainEl.classList.add('has-notch');
+                    } else {
+                        mainEl.classList.remove('has-notch');
+                    }
+                }
+
+                drawFrames();
+            }
+
+            function animate() {
+                const time = Date.now();
+                const active = THEMES[currentTheme];
+                const alphaScale = currentTheme === 'light' ? 0.45 : 1;
+                const dpr = window.devicePixelRatio || 1;
+
+                // Render Aether BG
+                bgCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                bgCtx.fillStyle = active.bg;
+                bgCtx.fillRect(0, 0, window.innerWidth, window.innerHeight);
+                for (let y = 0; y < rows; y++) {
+                    for (let x = 0; x < cols; x++) {
+                        const h = Math.sin(time * 0.0003 + x * 0.01 + y * 0.005) * 0.4 + Math.cos(time * 0.0008 + Math.sqrt(x * x + y * y) * 0.03) * 0.3;
+                        bgCtx.globalAlpha = Math.min(1, (grid[y][x].baseAlpha + (h + 1.2) * 0.3) * alphaScale);
+                        bgCtx.fillStyle = active.aether[Math.min(4, Math.max(0, Math.floor((h + 1.25) * 2)))];
+                        bgCtx.fillText(BRAILLE_FLOW[Math.floor(Math.max(0, Math.min(BRAILLE_FLOW.length - 1, (h + 1.2) * 4)))], x * CHAR_WIDTH, y * CHAR_HEIGHT);
+                    }
+                }
+
+                // Big logo woven into the same background, blended so the panels sit over it
+                bgCtx.setTransform(dpr * blScale, 0, 0, dpr * blScale, blOX * dpr, blOY * dpr);
+                bgCtx.globalAlpha = currentTheme === 'light' ? 0.85 : 1;
+                for (let y = 0; y < BH; y++) {
+                    for (let x = 0; x < BW; x++) {
+                        if (LOGO_ROWS[y][x] !== '⠀') {
+                            bgCtx.fillStyle = waterfallColor(time * 0.00006 - y * 0.08);
+                            bgCtx.fillText(LOGO_ROWS[y][x], x * CHAR_WIDTH, y * CHAR_HEIGHT);
+                        }
+                    }
+                }
+
+                requestAnimationFrame(animate);
+            }
+
+            window.addEventListener('resize', initCanvas);
+            initCanvas();
+            animate();
+
+            // --- State & Parsing ---
+            const navTarget = document.getElementById('sidebar-nav');
+            const contentTarget = document.getElementById('content-area');
+            const journalBtn = document.getElementById('journal-btn');
+            const repoBadges = document.querySelectorAll('.repo-badge');
+            const hoverThumb = document.getElementById('hover-thumb');
+
+            // Bottom-left preview: hovering a post shows its sketch (same name as
+            // the post's .txt, .png), tinted with the body-text colour and flipping
+            // with the theme. White-background line art is converted on the fly into
+            // an alpha mask (dark -> opaque, white -> transparent) so plain scans
+            // work without prep; already-transparent art is respected too. Sticks on
+            // the last hovered post and hides itself if the image is missing.
+            const thumbCache = {};
+            function applyMask(src, url) {
+                if (hoverThumb.dataset.src !== src) return;          // superseded by a newer hover
+                if (!url) { hoverThumb.classList.remove('show'); return; }
+                hoverThumb.style.webkitMaskImage = `url("${url}")`;
+                hoverThumb.style.maskImage = `url("${url}")`;
+                hoverThumb.classList.add('show');
+            }
+            function showThumb(src) {
+                if (hoverThumb.dataset.src === src) return;
+                hoverThumb.dataset.src = src;
+                if (src in thumbCache) return applyMask(src, thumbCache[src]);
+                const img = new Image();
+                img.onload = () => {
+                    let url = src; // fall back to the raw file if pixel access is blocked
+                    try {
+                        const cv = document.createElement('canvas');
+                        cv.width = img.naturalWidth;
+                        cv.height = img.naturalHeight;
+                        const ctx = cv.getContext('2d');
+                        ctx.drawImage(img, 0, 0);
+                        const im = ctx.getImageData(0, 0, cv.width, cv.height), p = im.data;
+                        for (let i = 0; i < p.length; i += 4) {
+                            const lum = 0.299 * p[i] + 0.587 * p[i + 1] + 0.114 * p[i + 2];
+                            const d = 255 - lum;                     // darkness
+                            const k = d <= 12 ? 0 : Math.min(255, (d - 12) * 1.25);
+                            p[i + 3] = p[i + 3] * k / 255;           // keep existing transparency
+                        }
+                        ctx.putImageData(im, 0, 0);
+                        url = cv.toDataURL();
+                    } catch (e) { /* tainted canvas: use the file as-is */ }
+                    thumbCache[src] = url;
+                    applyMask(src, url);
+                };
+                img.onerror = () => { thumbCache[src] = null; applyMask(src, null); };
+                img.src = src;
+            }
+            contentTarget.addEventListener('mouseover', e => {
+                const post = e.target.closest('.post');
+                if (post && post.dataset.id) showThumb(`blog/${post.dataset.id}.png`);
+            });
+            let blogIds = [];
+            let postsPromise = null;
+
+            // view === null -> Journal (all entries); view === id -> project filter
+            function selectView(view) {
+                document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+                journalBtn.classList.toggle('active', view === null);
+                if (view) {
+                    const li = navTarget.querySelector(`.nav-item[data-id="${CSS.escape(view)}"]`);
+                    if (li) li.classList.add('active');
+                }
+                loadFeed(view);
+            }
+
+            journalBtn.addEventListener('click', () => {
+                selectView(null);
+                history.pushState({}, '', location.pathname);
+            });
+
+            async function initApp() {
+                try {
+                    const res = await fetch('index.txt', { cache: 'no-store' });
+                    if (!res.ok) throw new Error('index.txt missing');
+                    parseIndex(await res.text());
+                } catch (e) {
+                    navTarget.innerHTML = `<div class="empty-state error">${e.message}</div>`;
+                    return;
+                }
+
+                const filter = new URLSearchParams(location.search).get('filter');
+                selectView(filter || null);
+            }
+
+            function parseIndex(text) {
+                navTarget.innerHTML = '';
+                blogIds = [];
+                postsPromise = null;
+
+                let list = null; // current group's <ul>
+                text.split(/\r?\n/).forEach(line => {
+                    const t = line.trim();
+                    if (!t) return;
+
+                    if (t.startsWith('# ')) {
+                        // top-level section titles (PROJECTS / BLOG) are not rendered
+                        list = null;
+                    } else if (t.startsWith('@FIELD ')) {
+                        // each field is its own visually grouped container
+                        const group = document.createElement('div');
+                        group.className = 'nav-group';
+                        const label = document.createElement('div');
+                        label.className = 'nav-group-label';
+                        label.textContent = t.substring(7);
+                        group.appendChild(label);
+                        list = document.createElement('ul');
+                        group.appendChild(list);
+                        navTarget.appendChild(group);
+                    } else if (t.startsWith('!PROJECT ')) {
+                        const itemId = t.substring(9);
+                        if (!list) {
+                            const group = document.createElement('div');
+                            group.className = 'nav-group';
+                            list = document.createElement('ul');
+                            group.appendChild(list);
+                            navTarget.appendChild(group);
+                        }
+                        const li = document.createElement('li');
+                        li.className = 'nav-item';
+                        li.textContent = itemId;
+                        li.dataset.id = itemId;
+                        li.onclick = () => {
+                            // clicking the already-selected project clears it back to Journal
+                            if (li.classList.contains('active')) {
+                                selectView(null);
+                                history.pushState({}, '', location.pathname);
+                            } else {
+                                selectView(itemId);
+                                history.pushState({}, '', `?filter=${encodeURIComponent(itemId)}`);
+                            }
+                        };
+                        list.appendChild(li);
+                    } else if (t.startsWith('!BLOG ')) {
+                        blogIds.push(t.substring(6));
+                    }
+                });
+            }
+
+            // --- Parse one post file into a plain object ---
+            function parsePost(text) {
+                const o = { title: '', sub: '', date: '', tags: [], field: '', links: [], body: [] };
+                let isBody = false;
+                text.split(/\r?\n/).forEach(line => {
+                    const t = line.trim();
+                    if (!t) return;
+                    if (t === '---') { isBody = true; return; }
+                    if (!isBody) {
+                        if (t.startsWith('@TITLE ')) o.title = t.substring(7);
+                        else if (t.startsWith('@SUB ')) o.sub = t.substring(5);
+                        else if (t.startsWith('@DATE ')) o.date = t.substring(6);
+                        else if (t.startsWith('@TAGS ')) o.tags = t.substring(6).split(',').map(s => s.trim()).filter(Boolean);
+                        else if (t.startsWith('@FIELD ')) o.field = t.substring(7);
+                        else if (t.startsWith('@LINK_')) o.links.push({
+                            label: t.substring(6, t.indexOf(' ')).toLowerCase(),
+                            href: t.substring(t.indexOf(' ') + 1)
+                        });
+                    } else {
+                        if (t.startsWith('~ ')) o.body.push({ type: 'p', val: t.substring(2) });
+                        else if (t.startsWith('[IMG] ')) o.body.push({ type: 'img', val: t.substring(6) });
+                    }
+                });
+                return o;
+            }
+
+            function linksRow(links) {
+                const row = document.createElement('div');
+                row.className = 'post-links';
+                links.forEach(l => {
+                    const a = document.createElement('a');
+                    a.className = 'btn';
+                    a.href = l.href;
+                    a.target = '_blank';
+                    a.rel = 'noopener';
+                    a.textContent = l.label;
+                    row.appendChild(a);
+                });
+                return row;
+            }
+
+            function renderPost(o) {
+                const art = document.createElement('article');
+                art.className = 'post';
+                if (o.id) art.dataset.id = o.id;
+                if (o.title) {
+                    const h = document.createElement('h1');
+                    h.className = 'post-title';
+                    h.textContent = o.title;
+                    art.appendChild(h);
+                }
+                const meta = [];
+                if (o.date) meta.push(o.date);
+                o.tags.forEach(t => meta.push(t));
+                if (o.field) meta.push(o.field);
+                if (meta.length) {
+                    const m = document.createElement('div');
+                    m.className = 'post-meta';
+                    m.textContent = meta.join('  ·  ');
+                    art.appendChild(m);
+                }
+                if (o.sub) {
+                    const s = document.createElement('div');
+                    s.className = 'post-sub';
+                    s.textContent = o.sub;
+                    art.appendChild(s);
+                }
+                if (o.links.length) art.appendChild(linksRow(o.links));
+                const body = document.createElement('div');
+                body.className = 'post-body';
+                o.body.forEach(b => {
+                    if (b.type === 'p') {
+                        const p = document.createElement('p');
+                        p.className = 'post-p';
+                        p.textContent = b.val;
+                        body.appendChild(p);
+                    } else {
+                        const img = document.createElement('img');
+                        img.src = b.val;
+                        img.loading = 'lazy';
+                        img.onerror = () => img.remove();
+                        body.appendChild(img);
+                    }
+                });
+                art.appendChild(body);
+                return art;
+            }
+
+            // Show the GitHub badge(s) only when the selected project file carries a
+            // @LINK_GITHUB directive; hide on the Journal view or if absent.
+            async function setRepoLink(filterId) {
+                repoBadges.forEach(b => b.classList.remove('show'));
+                if (!filterId) return;
+                try {
+                    const r = await fetch(`${filterId}.txt`, { cache: 'no-store' });
+                    if (!r.ok) return;
+                    const gh = parsePost(await r.text()).links.find(l => l.label === 'github');
+                    if (gh) repoBadges.forEach(b => { b.href = gh.href; b.classList.add('show'); });
+                } catch (e) { /* no repo link for this project */ }
+            }
+
+            function getPosts() {
+                if (!postsPromise) {
+                    postsPromise = Promise.all(blogIds.map(id =>
+                        fetch(`blog/${id}.txt`, { cache: 'no-store' })
+                            .then(r => r.ok ? r.text() : null)
+                            .catch(() => null)
+                            .then(text => text ? Object.assign(parsePost(text), { id }) : null)
+                    )).then(arr => arr.filter(Boolean));
+                }
+                return postsPromise;
+            }
+
+            // filterId === null  -> the whole blog
+            // filterId === "id"  -> only posts tagged with that id
+            async function loadFeed(filterId) {
+                contentTarget.innerHTML = '<div class="empty-state">Loading…</div>';
+                setRepoLink(filterId);
+                const posts = await getPosts();
+                const shown = filterId
+                    ? posts.filter(p => p.tags.some(t => t.toLowerCase() === filterId.toLowerCase()))
+                    : posts;
+
+                contentTarget.innerHTML = '';
+                if (shown.length) {
+                    shown.forEach(p => contentTarget.appendChild(renderPost(p)));
+                } else {
+                    const e = document.createElement('div');
+                    e.className = 'empty-state';
+                    e.textContent = filterId ? `No entries tagged “${filterId}” yet.` : 'No posts yet.';
+                    contentTarget.appendChild(e);
+                }
+                contentTarget.parentElement.scrollTop = 0;
+            }
+
+            window.addEventListener('popstate', initApp);
+            initApp();
+        })();
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,6 @@
+@TYPE project
+@TITLE Moracore
+@FIELD Personal
+@SUB Blog-like archive for logging small discoveries and projects.
+@LINK_PAGES https://moracore.github.io/
+@LINK_GITHUB https://moracore.github.io/

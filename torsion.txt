@@ -1,0 +1,7 @@
+@TYPE project
+@TITLE torsion
+@FIELD Protein Structure Tools
+@SUB Interactive 3D visualiser for dihedral angles along a polypeptide backbone.
+@LINK_PAGES https://moracore.github.io/torsion
+@LINK_REL https://github.com/moracore/torsion/releases/latest
+@LINK_GITHUB https://github.com/moracore/torsion

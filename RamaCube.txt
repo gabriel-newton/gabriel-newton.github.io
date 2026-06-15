@@ -1,0 +1,6 @@
+@TYPE project
+@TITLE RamaCube
+@FIELD Protein Structure Tools
+@SUB Three-dimensional Ramachandran explorer for backbone dihedral space.
+@LINK_PAGES https://moracore.github.io/ramacube
+@LINK_GITHUB https://github.com/moracore/ramacube

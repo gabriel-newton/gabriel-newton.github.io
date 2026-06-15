@@ -1,0 +1,6 @@
+@TYPE project
+@TITLE ProtNRD
+@FIELD Protein Structure Tools
+@SUB Neural rotamer denoiser for cleaning up predicted side-chain placements.
+@LINK_PAGES https://moracore.github.io/protnrd
+@LINK_GITHUB https://github.com/moracore/protnrd
