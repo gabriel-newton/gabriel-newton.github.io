@@ -1,5 +1,5 @@
 @TYPE blog
-@TITLE Moracore
+@TITLE Moracore Initial State
 @DATE 2026-06-15
 @TAGS moracore, blog, github
 ---

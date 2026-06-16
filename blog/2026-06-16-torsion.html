@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Torsion — frozen default scene</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
+    #c { width: 100%; height: 100%; display: block; touch-action: none; }
+    /* CSS2D atom labels */
+    .atom-label {
+      font: 700 12px/1 'Fira Code', ui-monospace, monospace;
+      color: #111;
+      background: rgba(255,255,255,0.82);
+      border-radius: 4px;
+      padding: 1px 5px;
+      pointer-events: none;
+      white-space: nowrap;
+      transform: translateY(-2px);
+    }
+  </style>
+</head>
+<body>
+  <div id="c"></div>
+
+  <!-- Pinned to the same three.js major the Torsion app builds against (^0.183). -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.183.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.183.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Default scene parameters — the exact "single" mode the Torsion app boots
+    // into (App.tsx): one φ angle of 60°, idealized backbone, planes on,
+    // parallelogram style. All geometry below is ported verbatim from the app's
+    // utils/math.ts (buildKinematicChain) and components/TorsionLinkage.tsx.
+    // ─────────────────────────────────────────────────────────────────────────
+    const D = 2.0;             // global bond length
+    const STANDARD_PHI = 60;   // default torsion angle (degrees)
+    const ATOM_RADIUS = 0.25;
+    const POSITIVE_COLOR = '#00d68f'; // angle sector colour for a positive angle
+
+    // φ atom labels: ['C','N','Cα'] starting at offset 0  →  C, N, Cα, C
+    const LABELS = ['C', 'N', 'Cα', 'C'];
+    // bond angle at the central atom of the i=2 / i=3 frames (N=121°, Cα=111°)
+    const atomParams = [
+      { d: D, theta: 0,                          phi: 0 },
+      { d: D, theta: 0,                          phi: 0 },
+      { d: D, theta: THREE.MathUtils.degToRad(121), phi: 0 },
+      { d: D, theta: THREE.MathUtils.degToRad(111), phi: THREE.MathUtils.degToRad(STANDARD_PHI) },
+    ];
+
+    // Forward kinematics from internal coordinates (utils/math.ts).
+    function buildKinematicChain(params) {
+      const positions = [];
+      for (let i = 0; i < params.length; i++) {
+        const p = params[i];
+        if (i === 0) {
+          positions.push(new THREE.Vector3(0, 0, 0));
+        } else if (i === 1) {
+          positions.push(new THREE.Vector3(p.d, 0, 0));
+        } else if (i === 2) {
+          const A = positions[0], B = positions[1];
+          const e1 = new THREE.Vector3().subVectors(A, B).normalize();
+          const e2 = new THREE.Vector3(0, 1, 0);
+          const C_rel = new THREE.Vector3()
+            .addScaledVector(e1, Math.cos(p.theta))
+            .addScaledVector(e2, Math.sin(p.theta))
+            .multiplyScalar(p.d);
+          positions.push(new THREE.Vector3().addVectors(B, C_rel));
+        } else {
+          const A = positions[i - 3], B = positions[i - 2], C = positions[i - 1];
+          const BA = new THREE.Vector3().subVectors(A, B);
+          const BC = new THREE.Vector3().subVectors(C, B);
+          const e1 = new THREE.Vector3().subVectors(B, C).normalize();
+          let n = new THREE.Vector3().crossVectors(BA, BC).normalize();
+          if (n.lengthSq() < 0.0001) n = new THREE.Vector3(0, 0, 1);
+          const e2 = new THREE.Vector3().crossVectors(n, e1).normalize();
+          const e3 = n;
+          const D_rel = new THREE.Vector3()
+            .addScaledVector(e1, Math.cos(p.theta))
+            .addScaledVector(e2, Math.sin(p.theta) * Math.cos(-p.phi))
+            .addScaledVector(e3, Math.sin(p.theta) * Math.sin(-p.phi))
+            .multiplyScalar(p.d);
+          positions.push(new THREE.Vector3().addVectors(C, D_rel));
+        }
+      }
+      return positions;
+    }
+
+    // Parallelogram torsion plane (TorsionLinkage.buildPlaneGeometry, 'parallelogram').
+    function buildParallelogram(apex, b, c) {
+      const apex2 = new THREE.Vector3().addVectors(apex, c).sub(b); // apex + C - B
+      const verts = new Float32Array([
+        apex.x, apex.y, apex.z, b.x, b.y, b.z, c.x, c.y, c.z,
+        apex.x, apex.y, apex.z, c.x, c.y, c.z, apex2.x, apex2.y, apex2.z,
+      ]);
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
+      geo.computeVertexNormals();
+      return geo;
+    }
+
+    // Rounded angle sector swept from plane-1's perpendicular (w1) to plane-2's
+    // (w2) about the B–C axis (TorsionLinkage sectorGeometry, ±180 mode).
+    function buildSector(A, B, C, Dpt, d) {
+      const radius = d * 0.5;
+      const midBC = new THREE.Vector3().addVectors(B, C).multiplyScalar(0.5);
+      const un = new THREE.Vector3().subVectors(C, B).normalize();
+
+      const v1 = new THREE.Vector3().subVectors(A, B);
+      let n1 = new THREE.Vector3().crossVectors(un, v1).normalize();
+      if (n1.lengthSq() < 0.001) n1 = new THREE.Vector3(0, 0, 1);
+      let w1 = new THREE.Vector3().crossVectors(n1, un).normalize();
+      if (v1.dot(w1) < 0) w1.negate();
+
+      const v2 = new THREE.Vector3().subVectors(Dpt, C);
+      let normal2 = new THREE.Vector3().crossVectors(un, v2).normalize();
+      if (normal2.lengthSq() < 0.001) normal2 = new THREE.Vector3(0, 0, 1);
+      let w2 = new THREE.Vector3().crossVectors(normal2, un).normalize();
+      if (v2.dot(w2) < 0) w2.negate();
+
+      const crossW = new THREE.Vector3().crossVectors(w1, w2);
+      const sign = Math.sign(crossW.dot(un));
+      let angle = w1.angleTo(w2);
+      if (sign < 0) angle = -angle;
+
+      const segments = 32;
+      const pts = [midBC.x, midBC.y, midBC.z];
+      for (let i = 0; i <= segments; i++) {
+        const dir = w1.clone().applyAxisAngle(un, angle * (i / segments)).multiplyScalar(radius);
+        const edgePt = midBC.clone().add(dir);
+        pts.push(edgePt.x, edgePt.y, edgePt.z);
+      }
+      const indices = [];
+      for (let i = 1; i <= segments; i++) indices.push(0, i, i + 1);
+
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+      geo.setIndex(indices);
+      geo.computeVertexNormals();
+      return geo;
+    }
+
+    // ── Build the scene ────────────────────────────────────────────────────
+    const positions = buildKinematicChain(atomParams);
+    const [A, B, C, Dpt] = positions; // active frame in single mode: idx 0..3
+    const midBC = new THREE.Vector3().addVectors(B, C).multiplyScalar(0.5);
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
+    camera.position.set(0, 4, 8);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setClearColor(0x000000, 0);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    document.getElementById('c').appendChild(renderer.domElement);
+
+    const labelRenderer = new CSS2DRenderer();
+    labelRenderer.domElement.style.position = 'absolute';
+    labelRenderer.domElement.style.top = '0';
+    labelRenderer.domElement.style.left = '0';
+    labelRenderer.domElement.style.pointerEvents = 'none';
+    document.getElementById('c').appendChild(labelRenderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.copy(midBC);
+    controls.minDistance = 2;
+    controls.maxDistance = 20;
+    controls.enablePan = true;
+    controls.update();
+
+    const root = new THREE.Group();
+    scene.add(root);
+
+    // bonds: thin black sticks between consecutive atoms
+    function addBond(p1, p2) {
+      const dir = new THREE.Vector3().subVectors(p2, p1);
+      const len = dir.length();
+      const geo = new THREE.CylinderGeometry(0.05, 0.05, len, 16);
+      const mat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.copy(new THREE.Vector3().addVectors(p1, p2).multiplyScalar(0.5));
+      mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
+      root.add(mesh);
+    }
+    for (let i = 1; i < positions.length; i++) addBond(positions[i - 1], positions[i]);
+
+    // dashed white B–C bond axis (the torsion axis)
+    {
+      const geo = new THREE.BufferGeometry().setFromPoints([B, C]);
+      const mat = new THREE.LineDashedMaterial({ color: 0xffffff, dashSize: 0.2, gapSize: 0.1 });
+      const line = new THREE.Line(geo, mat);
+      line.computeLineDistances();
+      root.add(line);
+    }
+
+    // atoms: dark spheres for C/Cα, blue for N, with a yellow focus halo (all
+    // four atoms are "focus" in single mode) and a CSS2D element label.
+    positions.forEach((pos, i) => {
+      const isCarbon = LABELS[i] === 'C' || LABELS[i] === 'Cα';
+      const g = new THREE.Group();
+      g.position.copy(pos);
+
+      const core = new THREE.Mesh(
+        new THREE.SphereGeometry(ATOM_RADIUS, 32, 32),
+        new THREE.MeshBasicMaterial({ color: isCarbon ? 0x222222 : 0x3b82f6 })
+      );
+      g.add(core);
+
+      const halo = new THREE.Mesh(
+        new THREE.SphereGeometry(ATOM_RADIUS + 0.03, 32, 32),
+        new THREE.MeshBasicMaterial({ color: 0xffcc00, side: THREE.BackSide })
+      );
+      g.add(halo);
+
+      const el = document.createElement('div');
+      el.className = 'atom-label';
+      el.textContent = LABELS[i];
+      const label = new CSS2DObject(el);
+      label.position.set(0, ATOM_RADIUS + 0.35, 0);
+      g.add(label);
+
+      root.add(g);
+    });
+
+    // torsion planes (parallelogram) + their grey edges
+    const plane1 = buildParallelogram(A, B, C);  // A bonds to B
+    const plane2 = buildParallelogram(Dpt, C, B); // D bonds to C
+    function addPlane(geo, color) {
+      root.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+        color, side: THREE.DoubleSide, transparent: true, opacity: 0.6, depthWrite: false,
+      })));
+      root.add(new THREE.LineSegments(
+        new THREE.EdgesGeometry(geo),
+        new THREE.LineBasicMaterial({ color: 0x999999, transparent: true, opacity: 1 })
+      ));
+    }
+    addPlane(plane1, 0xdddddd);
+    addPlane(plane2, 0xbbbbbb);
+
+    // green angle sector + edge (60° is a plain positive sweep, no square marker)
+    const sector = buildSector(A, B, C, Dpt, D);
+    root.add(new THREE.Mesh(sector, new THREE.MeshBasicMaterial({
+      color: POSITIVE_COLOR, side: THREE.DoubleSide, transparent: true, opacity: 0.8, depthWrite: false,
+    })));
+    root.add(new THREE.LineSegments(
+      new THREE.EdgesGeometry(sector),
+      new THREE.LineBasicMaterial({ color: POSITIVE_COLOR })
+    ));
+
+    // ── Render loop + resize ────────────────────────────────────────────────
+    function resize() {
+      const w = document.getElementById('c').clientWidth || window.innerWidth;
+      const h = document.getElementById('c').clientHeight || window.innerHeight;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+      labelRenderer.setSize(w, h);
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+      labelRenderer.render(scene, camera);
+    }
+    animate();
+  </script>
+</body>
+</html>

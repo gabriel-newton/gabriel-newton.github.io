@@ -275,6 +275,29 @@
             inset: 0;
         }
 
+        /* self-contained interactive scene for posts that ship a blog/<id>.html */
+        #hover-embed {
+            position: absolute;
+            inset: 8px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.25s ease;
+        }
+
+        #hover-embed.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        #hover-embed iframe {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            border: 0;
+            background: transparent;
+        }
+
         .nav-group {
             background: var(--hover-bg);
             border: 1px solid var(--hr);
@@ -583,6 +606,7 @@
             <div id="sidebar-canvas-space">
                 <div id="hover-thumb" aria-hidden="true"></div>
                 <div id="hover-graph" aria-hidden="true"></div>
+                <div id="hover-embed" aria-hidden="true"></div>
             </div>
         </aside>
 
@@ -812,6 +836,7 @@
             const repoBadges = document.querySelectorAll('.repo-badge');
             const hoverThumb = document.getElementById('hover-thumb');
             const graphHost = document.getElementById('hover-graph');
+            const embedHost = document.getElementById('hover-embed');
 
             // Bottom-left preview for the hovered post (sticks on the last one):
             //  - if blog/<id>.json exists, render it as an interactive Plotly graph
@@ -821,7 +846,9 @@
             //    fly, so plain scans work; existing transparency is respected).
             let currentPreview = null;
             const thumbCache = {};
-            const graphCache = {};   // id -> { el } when a graph exists, or null when known absent
+            const graphCache = {};   // id -> { el } once a Plotly graph is built
+            const embedCache = {};   // id -> { el } once an iframe scene is built
+            const previewKind = {};  // id -> 'graph' | 'embed' | 'sketch' once resolved
 
             // --- sketch (image) path ---
             function applyMask(src, url) {
@@ -861,6 +888,7 @@
             }
             function showSketch(id) {
                 graphHost.classList.remove('show');
+                embedHost.classList.remove('show');
                 showThumb(`blog/${id}.png`);
             }
 
@@ -903,11 +931,35 @@
             }
             function revealGraph(id) {
                 hoverThumb.classList.remove('show');
+                embedHost.classList.remove('show');
                 Object.keys(graphCache).forEach(k => {
                     if (graphCache[k]) graphCache[k].el.style.display = (k === id ? 'block' : 'none');
                 });
                 graphHost.classList.add('show');
                 if (window.Plotly && graphCache[id]) window.Plotly.Plots.resize(graphCache[id].el);
+            }
+
+            // --- interactive scene (self-contained blog/<id>.html) path ---
+            function revealEmbed(id) {
+                hoverThumb.classList.remove('show');
+                graphHost.classList.remove('show');
+                Object.keys(embedCache).forEach(k => {
+                    if (embedCache[k]) embedCache[k].el.style.display = (k === id ? 'block' : 'none');
+                });
+                embedHost.classList.add('show');
+            }
+            function renderEmbed(id) {
+                if (!embedCache[id]) {
+                    const el = document.createElement('iframe');
+                    el.loading = 'lazy';
+                    // first-party scene; scripts run, keeps its origin so module/CDN loads work
+                    el.setAttribute('sandbox', 'allow-scripts allow-same-origin');
+                    el.src = `blog/${id}.html`;
+                    embedHost.appendChild(el);
+                    embedCache[id] = { el };
+                }
+                previewKind[id] = 'embed';
+                if (currentPreview === id) revealEmbed(id);
             }
             function reskinVisibleGraph() {
                 if (!window.Plotly || !currentPreview || !graphCache[currentPreview]) return;
@@ -921,12 +973,17 @@
                 });
             }
 
-            // --- pick graph or sketch for the hovered post ---
+            // --- pick the preview for the hovered post ---
+            // Resolution order, keyed off the post id: a Plotly figure
+            // (blog/<id>.json) → a self-contained interactive scene
+            // (blog/<id>.html) → a line-art sketch (blog/<id>.png).
             function showPreview(id) {
                 if (currentPreview === id) return;
                 currentPreview = id;
-                if (id in graphCache) {
-                    graphCache[id] ? revealGraph(id) : showSketch(id);
+                if (previewKind[id]) {
+                    if (previewKind[id] === 'graph') revealGraph(id);
+                    else if (previewKind[id] === 'embed') revealEmbed(id);
+                    else showSketch(id);
                     return;
                 }
                 fetch(`blog/${id}.json`, { cache: 'no-store' })
@@ -934,23 +991,75 @@
                     .catch(() => null)
                     .then(fig => {
                         if (currentPreview !== id) return;
-                        if (!fig) { graphCache[id] = null; showSketch(id); return; }
-                        loadPlotly().then(Plotly => {
-                            if (currentPreview !== id) return;
-                            const el = document.createElement('div');
-                            el.className = 'graph-instance';
-                            graphHost.appendChild(el);
-                            Plotly.newPlot(el, fig.data || [], themedLayout(fig.layout || {}),
-                                { displayModeBar: false, responsive: true })
-                                .then(() => { graphCache[id] = { el }; if (currentPreview === id) revealGraph(id); });
-                        }).catch(() => { graphCache[id] = null; if (currentPreview === id) showSketch(id); });
+                        if (fig) {
+                            loadPlotly().then(Plotly => {
+                                if (currentPreview !== id) return;
+                                const el = document.createElement('div');
+                                el.className = 'graph-instance';
+                                graphHost.appendChild(el);
+                                Plotly.newPlot(el, fig.data || [], themedLayout(fig.layout || {}),
+                                    { displayModeBar: false, responsive: true })
+                                    .then(() => { graphCache[id] = { el }; previewKind[id] = 'graph'; if (currentPreview === id) revealGraph(id); });
+                            }).catch(() => { if (currentPreview === id) { previewKind[id] = 'sketch'; showSketch(id); } });
+                            return;
+                        }
+                        // no figure: probe for a self-contained scene, else fall back to a sketch
+                        fetch(`blog/${id}.html`, { method: 'HEAD', cache: 'no-store' })
+                            .then(r => {
+                                if (currentPreview !== id) return;
+                                if (r.ok) renderEmbed(id);
+                                else { previewKind[id] = 'sketch'; showSketch(id); }
+                            })
+                            .catch(() => { if (currentPreview === id) { previewKind[id] = 'sketch'; showSketch(id); } });
                     });
             }
 
+            // Desktop drives the preview by hovering a post. Touch/mobile has no
+            // hover, so there the active post is whichever one sits in the upper
+            // third of the scrolling blog view instead.
+            const mobileMq = window.matchMedia('(max-width: 760px)');
+            const scrollEl = contentTarget.parentElement;
+
             contentTarget.addEventListener('mouseover', e => {
+                if (mobileMq.matches) return;
                 const post = e.target.closest('.post');
                 if (post && post.dataset.id) showPreview(post.dataset.id);
             });
+
+            // Mobile: the active post is the last one whose top has crossed the
+            // line 1/3 of the way down the blog view — i.e. the post occupying
+            // the upper third. Re-run on scroll (rAF-throttled), on entering the
+            // mobile layout, and after a feed renders.
+            function activatePostInView() {
+                if (!mobileMq.matches) return;
+                const posts = contentTarget.querySelectorAll('.post');
+                if (!posts.length) return;
+                let chosen;
+                // The oldest post sits at the bottom of the feed and can never
+                // reach the upper third, so once scrolled to the end pin it.
+                if (scrollEl.scrollTop + scrollEl.clientHeight >= scrollEl.scrollHeight - 2) {
+                    chosen = posts[posts.length - 1];
+                } else {
+                    const rect = scrollEl.getBoundingClientRect();
+                    const lineY = rect.top + rect.height / 3;
+                    chosen = posts[0];
+                    posts.forEach(p => {
+                        if (p.getBoundingClientRect().top <= lineY) chosen = p;
+                    });
+                }
+                if (chosen && chosen.dataset.id) showPreview(chosen.dataset.id);
+            }
+
+            let previewScrollRAF = 0;
+            scrollEl.addEventListener('scroll', () => {
+                if (!mobileMq.matches || previewScrollRAF) return;
+                previewScrollRAF = requestAnimationFrame(() => {
+                    previewScrollRAF = 0;
+                    activatePostInView();
+                });
+            }, { passive: true });
+
+            mobileMq.addEventListener('change', () => { if (mobileMq.matches) activatePostInView(); });
             let blogIds = [];
             let postsPromise = null;
 
@@ -1177,6 +1286,7 @@
                     contentTarget.appendChild(e);
                 }
                 contentTarget.parentElement.scrollTop = 0;
+                activatePostInView();
             }
 
             window.addEventListener('popstate', initApp);

@@ -1,0 +1,9 @@
+@TYPE blog
+@TITLE Torsion Embedded Scene
+@DATE 2026-06-16
+@TAGS torsion, proteins, ramachandran
+---
+
+~ When first approaching Ramachandran plots I found it hard to visualize the dihedral angles shared by 4 atoms, even as someone with a mathematical background. I created a visualization tool to avoid this friction for people approaching the topic for the first time.
+~ It currently boasts 3 different modes: Single, shows a simple phi angle with a slider to alter the argument; a generator mode which allows for the generation of secondary structures using pre-determined dihedral combinations; and a PDB mode which sources full invariant information (3 torsion angles, 3 bond angles and 3 bond lengths) show segments of backbones from entries in the PDB.
+~ Meaning to source angles directly from PDB data. Ideally need to find amino acid residue sequences that have known spikes conforming to secondary structures.

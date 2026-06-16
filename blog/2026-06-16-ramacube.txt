@@ -1,5 +1,5 @@
 @TYPE blog
-@TITLE RamaCube
+@TITLE RamaCube Initial State
 @DATE 2026-06-16
 @TAGS ramacube, proteins, ramachandran
 ---
