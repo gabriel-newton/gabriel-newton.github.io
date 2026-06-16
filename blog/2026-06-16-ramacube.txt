@@ -1,0 +1,8 @@
+@TYPE blog
+@TITLE RamaCube
+@DATE 2026-06-16
+@TAGS ramacube, proteins, ramachandran
+---
+~ This project takes cleaned PDB data and creates 3d projections for phi, psi and omega angles, filtered by different amino acids. A 4th dimension has been simulated through the addition of colour scaling for counts.
+~ Current issues involve a few colour scaling bugs. One limitation was setting the minimum count for a bin so be 2, if used for a educational/strictly exploratory analysis minimum cound could be raised.
+~ Another idea was to add a filter that splits the graph into 2 graphs one that shows the phi/psi for omega values near 0 and another for omega values near 180.

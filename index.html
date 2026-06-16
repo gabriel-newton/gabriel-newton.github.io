@@ -231,10 +231,6 @@
             border-top: 1px solid var(--hr);
             position: relative;
             overflow: hidden;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 14px;
         }
 
         /* bottom-left preview of the post currently hovered in the feed */
@@ -242,8 +238,9 @@
            filled with the body-text colour, so it always matches the text and
            flips with the theme automatically */
         #hover-thumb {
-            width: 100%;
-            height: 100%;
+            position: absolute;
+            inset: 14px;
+            pointer-events: none;
             background-color: var(--name);
             -webkit-mask-repeat: no-repeat;
             mask-repeat: no-repeat;
@@ -257,6 +254,25 @@
 
         #hover-thumb.show {
             opacity: 1;
+        }
+
+        /* live Plotly graph for posts that ship a blog/<id>.json figure spec */
+        #hover-graph {
+            position: absolute;
+            inset: 8px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.25s ease;
+        }
+
+        #hover-graph.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        #hover-graph .graph-instance {
+            position: absolute;
+            inset: 0;
         }
 
         .nav-group {
@@ -500,26 +516,47 @@
 
         @media (max-width: 760px) {
             body {
-                overflow: auto;
+                overflow: hidden;
             }
             #app {
                 grid-template-columns: 1fr;
-                grid-template-rows: 96px auto auto;
-                height: auto;
-                min-height: 100%;
+                grid-template-rows: 96px 2fr 1fr;   /* logo, blog (~2/3), picture + switch */
+                height: 100%;
             }
-            aside {
-                grid-area: 2 / 1 / 3 / 2;
-            }
+            /* blog sits directly under the logo and takes the bulk of the screen */
             main {
-                grid-area: 3 / 1 / 4 / 2;
+                grid-area: 2 / 1 / 3 / 2;
                 padding: 0;
                 clip-path: none;
             }
             #scroll {
-                height: auto;
-                overflow: visible;
-                padding: 28px 22px;
+                height: 100%;
+                overflow-y: auto;
+                padding: 24px 22px;
+            }
+            /* bottom block: picture fills it; Journal + switch float on top */
+            aside {
+                grid-area: 3 / 1 / 4 / 2;
+                position: relative;
+            }
+            #brand {
+                position: absolute;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                z-index: 5;
+                border-bottom: none;
+                justify-content: flex-end;           /* lone switch stays on the right */
+                background: linear-gradient(transparent, var(--panel-bg));
+            }
+            #journal-btn {
+                display: none;                       /* no Journal button on mobile */
+            }
+            #sidebar-nav {
+                display: none;                       /* no projects list on mobile */
+            }
+            #sidebar-canvas-space {
+                flex: 1;                             /* picture uses the whole block */
             }
         }
     </style>
@@ -545,6 +582,7 @@
             <nav id="sidebar-nav"></nav>
             <div id="sidebar-canvas-space">
                 <div id="hover-thumb" aria-hidden="true"></div>
+                <div id="hover-graph" aria-hidden="true"></div>
             </div>
         </aside>
 
@@ -586,8 +624,10 @@
             }
             applyTheme(currentTheme);
 
-            toggleInput.addEventListener('change', () =>
-                applyTheme(toggleInput.checked ? 'light' : 'dark'));
+            toggleInput.addEventListener('change', () => {
+                applyTheme(toggleInput.checked ? 'light' : 'dark');
+                reskinVisibleGraph();
+            });
 
             // --- Canvas Rendering ---
             const FONT_SIZE = 14, CHAR_WIDTH = FONT_SIZE * 0.6, CHAR_HEIGHT = FONT_SIZE;
@@ -771,14 +811,19 @@
             const journalBtn = document.getElementById('journal-btn');
             const repoBadges = document.querySelectorAll('.repo-badge');
             const hoverThumb = document.getElementById('hover-thumb');
+            const graphHost = document.getElementById('hover-graph');
 
-            // Bottom-left preview: hovering a post shows its sketch (same name as
-            // the post's .txt, .png), tinted with the body-text colour and flipping
-            // with the theme. White-background line art is converted on the fly into
-            // an alpha mask (dark -> opaque, white -> transparent) so plain scans
-            // work without prep; already-transparent art is respected too. Sticks on
-            // the last hovered post and hides itself if the image is missing.
+            // Bottom-left preview for the hovered post (sticks on the last one):
+            //  - if blog/<id>.json exists, render it as an interactive Plotly graph
+            //    you can mouse over and orbit;
+            //  - otherwise show blog/<id>.png as a line-art sketch, tinted with the
+            //    body-text colour (white backgrounds are keyed out to alpha on the
+            //    fly, so plain scans work; existing transparency is respected).
+            let currentPreview = null;
             const thumbCache = {};
+            const graphCache = {};   // id -> { el } when a graph exists, or null when known absent
+
+            // --- sketch (image) path ---
             function applyMask(src, url) {
                 if (hoverThumb.dataset.src !== src) return;          // superseded by a newer hover
                 if (!url) { hoverThumb.classList.remove('show'); return; }
@@ -787,7 +832,6 @@
                 hoverThumb.classList.add('show');
             }
             function showThumb(src) {
-                if (hoverThumb.dataset.src === src) return;
                 hoverThumb.dataset.src = src;
                 if (src in thumbCache) return applyMask(src, thumbCache[src]);
                 const img = new Image();
@@ -815,9 +859,97 @@
                 img.onerror = () => { thumbCache[src] = null; applyMask(src, null); };
                 img.src = src;
             }
+            function showSketch(id) {
+                graphHost.classList.remove('show');
+                showThumb(`blog/${id}.png`);
+            }
+
+            // --- graph (Plotly) path ---
+            let plotlyPromise = null;
+            function loadPlotly() {
+                if (!plotlyPromise) {
+                    plotlyPromise = new Promise((resolve, reject) => {
+                        const s = document.createElement('script');
+                        // full bundle for reliability; swap for plotly-gl3d-<v>.min.js to slim it
+                        s.src = 'https://cdn.plot.ly/plotly-2.35.2.min.js';
+                        s.onload = () => resolve(window.Plotly);
+                        s.onerror = reject;
+                        document.head.appendChild(s);
+                    });
+                }
+                return plotlyPromise;
+            }
+            function themedLayout(layout) {
+                layout = layout || {};
+                const cs = getComputedStyle(document.documentElement);
+                const fontC = (cs.getPropertyValue('--desc') || '#888').trim();
+                const gridC = (cs.getPropertyValue('--hr') || 'rgba(128,128,128,0.2)').trim();
+                const axisTheme = { color: fontC, gridcolor: gridC, zerolinecolor: gridC, backgroundcolor: 'rgba(0,0,0,0)' };
+                const src = layout.scene || {};
+                // deep-merge: keep a figure's own axis titles/ranges/camera, but
+                // always apply our theme colours + transparent background under them
+                const scene = Object.assign({ bgcolor: 'rgba(0,0,0,0)' }, src, {
+                    xaxis: Object.assign({}, axisTheme, src.xaxis || {}),
+                    yaxis: Object.assign({}, axisTheme, src.yaxis || {}),
+                    zaxis: Object.assign({}, axisTheme, src.zaxis || {})
+                });
+                return Object.assign({
+                    paper_bgcolor: 'rgba(0,0,0,0)',
+                    plot_bgcolor: 'rgba(0,0,0,0)',
+                    margin: { l: 0, r: 0, t: 0, b: 0 },
+                    showlegend: false,
+                    font: { color: fontC, family: "'Fira Code', monospace", size: 10 }
+                }, layout, { scene: scene });
+            }
+            function revealGraph(id) {
+                hoverThumb.classList.remove('show');
+                Object.keys(graphCache).forEach(k => {
+                    if (graphCache[k]) graphCache[k].el.style.display = (k === id ? 'block' : 'none');
+                });
+                graphHost.classList.add('show');
+                if (window.Plotly && graphCache[id]) window.Plotly.Plots.resize(graphCache[id].el);
+            }
+            function reskinVisibleGraph() {
+                if (!window.Plotly || !currentPreview || !graphCache[currentPreview]) return;
+                const cs = getComputedStyle(document.documentElement);
+                const fontC = (cs.getPropertyValue('--desc') || '#888').trim();
+                const gridC = (cs.getPropertyValue('--hr') || 'rgba(128,128,128,0.2)').trim();
+                window.Plotly.relayout(graphCache[currentPreview].el, {
+                    'font.color': fontC,
+                    'scene.xaxis.color': fontC, 'scene.yaxis.color': fontC, 'scene.zaxis.color': fontC,
+                    'scene.xaxis.gridcolor': gridC, 'scene.yaxis.gridcolor': gridC, 'scene.zaxis.gridcolor': gridC
+                });
+            }
+
+            // --- pick graph or sketch for the hovered post ---
+            function showPreview(id) {
+                if (currentPreview === id) return;
+                currentPreview = id;
+                if (id in graphCache) {
+                    graphCache[id] ? revealGraph(id) : showSketch(id);
+                    return;
+                }
+                fetch(`blog/${id}.json`, { cache: 'no-store' })
+                    .then(r => r.ok ? r.json() : null)
+                    .catch(() => null)
+                    .then(fig => {
+                        if (currentPreview !== id) return;
+                        if (!fig) { graphCache[id] = null; showSketch(id); return; }
+                        loadPlotly().then(Plotly => {
+                            if (currentPreview !== id) return;
+                            const el = document.createElement('div');
+                            el.className = 'graph-instance';
+                            graphHost.appendChild(el);
+                            Plotly.newPlot(el, fig.data || [], themedLayout(fig.layout || {}),
+                                { displayModeBar: false, responsive: true })
+                                .then(() => { graphCache[id] = { el }; if (currentPreview === id) revealGraph(id); });
+                        }).catch(() => { graphCache[id] = null; if (currentPreview === id) showSketch(id); });
+                    });
+            }
+
             contentTarget.addEventListener('mouseover', e => {
                 const post = e.target.closest('.post');
-                if (post && post.dataset.id) showThumb(`blog/${post.dataset.id}.png`);
+                if (post && post.dataset.id) showPreview(post.dataset.id);
             });
             let blogIds = [];
             let postsPromise = null;
@@ -847,6 +979,13 @@
                     navTarget.innerHTML = `<div class="empty-state error">${e.message}</div>`;
                     return;
                 }
+
+                // blog list is auto-generated (scan_blog.py -> blog/posts.json),
+                // since static hosting can't list the blog/ directory at runtime
+                try {
+                    const br = await fetch('blog/posts.json', { cache: 'no-store' });
+                    blogIds = br.ok ? await br.json() : [];
+                } catch (e) { blogIds = []; }
 
                 const filter = new URLSearchParams(location.search).get('filter');
                 selectView(filter || null);
@@ -900,8 +1039,6 @@
                             }
                         };
                         list.appendChild(li);
-                    } else if (t.startsWith('!BLOG ')) {
-                        blogIds.push(t.substring(6));
                     }
                 });
             }
@@ -1014,7 +1151,8 @@
                             .then(r => r.ok ? r.text() : null)
                             .catch(() => null)
                             .then(text => text ? Object.assign(parsePost(text), { id }) : null)
-                    )).then(arr => arr.filter(Boolean));
+                    )).then(arr => arr.filter(Boolean)
+                        .sort((a, b) => (b.date || '').localeCompare(a.date || '')));  // newest first
                 }
                 return postsPromise;
             }
