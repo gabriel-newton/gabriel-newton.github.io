@@ -1,0 +1,15 @@
+@TYPE blog
+@TITLE IUCr 2026 Reference
+@DATE 2026-08-15
+@TAGS protnrd, iucr, proteins
+@LINK_APP https://web-production-ce7bf.up.railway.app/#Xx0pyg_Xp1pyg_Gg0pyg_Xx0pys_Xp2pyg_Gg0pys
+@LINK_TORSION https://moracore.github.io/torsion
+@LINK_RAMACUBE https://moracore.github.io/ramacube
+@LINK_RELEASE https://github.com/moracore/ProtNRD/releases/latest
+@LINK_BRI https://github.com/AAAAAkki/Backbone_invariant-public_release
+---
+~ A single reference point for the three protein structure tools and their source, collected here for IUCr 2026.
+~ ProtNRD is an interactive visualisation of protein backbone geometry, built on LAI invariants. It plots how backbone properties co-occur across thousands of high-quality PDB structures, conditioned on local sequence context. It runs in two modes: Pairwise, the geometry of one amino acid conditioned on a neighbouring residue at a chain separation of zero to four; and Trimer, the geometry of one position within a three-residue sequence context.
+~ Every layout is encoded in the URL fragment, so the address bar is always a shareable link to exactly what is on screen. The app link above opens a preconfigured six-panel layout rather than an empty workspace.
+~ Two companion tools sit alongside it. Torsion is an interactive 3D visualiser for dihedral angles along a polypeptide backbone. RamaCube is a three-dimensional Ramachandran explorer for backbone dihedral space.
+~ The invariants themselves are calculated by the BRI extension. The release link carries the ProtNRD source and setup instructions; the databases are hosted separately on Hugging Face and linked from there.
