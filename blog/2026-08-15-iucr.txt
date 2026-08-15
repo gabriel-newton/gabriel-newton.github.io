@@ -3,8 +3,8 @@
 @DATE 2026-08-15
 @TAGS protnrd, iucr, proteins
 @LINK_APP https://web-production-ce7bf.up.railway.app/#Xx0pyg_Xp1pyg_Gg0pyg_Xx0pys_Xp2pyg_Gg0pys
-@LINK_TORSION https://moracore.github.io/torsion
-@LINK_RAMACUBE https://moracore.github.io/ramacube
+@LINK_torsion https://moracore.github.io/torsion
+@LINK_RamaCube https://moracore.github.io/RamaCube
 @LINK_RELEASE https://github.com/moracore/ProtNRD/releases/latest
 @LINK_BRI https://github.com/AAAAAkki/Backbone_invariant-public_release
 ---
